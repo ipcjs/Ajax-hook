@@ -3,7 +3,7 @@
  * email: 824783146@qq.com
  * source code: https://github.com/wendux/Ajax-hook
  **/
-(function (global) {
+!function (global) {
     global.hookObject = function (object, name, hookObj) {
         var oriName = '_' + name;
         object[oriName] = object[oriName] || object[name];
@@ -69,4 +69,4 @@
         if (object[oriName]) object[name] = object[oriName];
         object[oriName] = undefined;
     }
-})(window);
+}(window);
