@@ -3,65 +3,70 @@
  * email: 824783146@qq.com
  * source code: https://github.com/wendux/Ajax-hook
  **/
-!function (ob) {
-    ob.hookAjax = function (funs) {
-        window._ahrealxhr = window._ahrealxhr || XMLHttpRequest
-        XMLHttpRequest = function () {
-            this.xhr = new window._ahrealxhr;
-            for (var attr in this.xhr) {
+(function (global) {
+    global.hookObject = function (object, name, hookObj) {
+        var oriName = '_' + name;
+        object[oriName] = object[oriName] || object[name];
+        object[name] = function (...args) {
+            this[oriName] = new object[oriName](...args);
+            for (var attr in this[oriName]) {
                 var type = "";
                 try {
-                    type = typeof this.xhr[attr]
-                } catch (e) {}
+                    type = typeof this[oriName][attr]
+                } catch (e) { }
                 if (type === "function") {
                     this[attr] = hookfun(attr);
                 } else {
                     Object.defineProperty(this, attr, {
-                        get: getFactory(attr),
-                        set: setFactory(attr)
+                        get: getterFactory(attr),
+                        set: setterFactory(attr)
                     })
                 }
             }
         }
 
-        function getFactory(attr) {
+        function getterFactory(attr) {
             return function () {
-                return this.hasOwnProperty(attr + "_")?this[attr + "_"]:this.xhr[attr];
+                return this.hasOwnProperty(attr + "_") ? this[attr + "_"] : this[oriName][attr];
             }
         }
 
-        function setFactory(attr) {
-            return function (f) {
-                var xhr = this.xhr;
+        function setterFactory(attr) {
+            return function (value) {
+                var origin = this[oriName];
                 var that = this;
-                if (attr.indexOf("on") != 0) {
-                    this[attr + "_"] = f;
-                    return;
-                }
-                if (funs[attr]) {
-                    xhr[attr] = function () {
-                        funs[attr](that) || f.apply(xhr, arguments);
+                if (attr.indexOf("on") === 0) {
+                    if (hookObj[attr]) {
+                        this['_' + attr] = value; // 保存原始的回调, 供外部使用
+                        origin[attr] = function () {
+                            if (hookObj[attr].apply(that, arguments)) {
+                                return;
+                            }
+                            return value.apply(origin, arguments);
+                        };
+                    } else {
+                        origin[attr] = value;
                     }
                 } else {
-                    xhr[attr] = f;
+                    // 设置的属性不是onXxx时, 保存到hook对象里面, 因为大多数回调函数中不是使用this来取属性(如xhr.responseText), 而是直接使用之前创建的hook对象
+                    this[attr + "_"] = value;
                 }
             }
         }
 
-        function hookfun(fun) {
+        function hookfun(attr) {
             return function () {
-                var args = [].slice.call(arguments)
-                if (funs[fun] && funs[fun].call(this, args, this.xhr)) {
+                if (hookObj[attr] && hookObj[attr].apply(this, arguments)) {
                     return;
                 }
-                return this.xhr[fun].apply(this.xhr, args);
+                return this[oriName][attr].apply(this[oriName], arguments);
             }
         }
-        return window._ahrealxhr;
+        return object[oriName];
     }
-    ob.unHookAjax = function () {
-        if (window._ahrealxhr)  XMLHttpRequest = window._ahrealxhr;
-        window._ahrealxhr = undefined;
+    global.unHookObject = function (object, name) {
+        var oriName = '_' + name;
+        if (object[oriName]) object[name] = object[oriName];
+        object[oriName] = undefined;
     }
-}(window)
-//}(module.exports)
+})(window);
